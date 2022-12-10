@@ -1,0 +1,87 @@
+---
+
+- hosts: all
+  become: true
+  pre_tasks:
+
+  -  name: Update Repository (Ubuntu)
+     apt:
+       upgrade: dist
+       update_cache: yes
+     changed_when: false
+     when: ansible_distribution == "Ubuntu"
+
+  -  name: Update Repository (CentOS)
+     dnf:
+       update_cache: yes
+     changed_when: false
+     when: ansible_distribution == "CentOs"
+
+- hosts: all
+  become: true
+  tasks:
+
+  -  name: Install docker application on (Ubuntu)
+     apt:
+       name: docker.io
+       state: latest
+     when: ansible_distribution == "Ubuntu"
+
+  -  name: Install docker application on (CentOS)
+     shell: 'curl -fsSL https://get.docker.com/ | sh'
+     when: ansible_distribution == "CentOS"
+
+  -  name: Install docker sdk application (Ubuntu)
+     apt:
+       name: python3-docker
+       update_cache: yes
+       cache_valid_time: 3600
+     when: ansible_distribution == "Ubuntu"
+
+  -  name: Docker applicatiopn permission (Ubuntu)
+     shell: 'sudo usermod -aG docker $USER'
+     when: ansible_distribution == "Ubuntu"
+
+  -  name: Install docker sdk application (CentOS)
+     yum:
+       name: python-docker-py
+       update_cache: yes
+     when: ansible_distribution == "CentOS"
+
+  -  name: Docker application permission (CentOS)
+     shell: 'sudo usermod -aG docker $(whoami)'
+     when: ansible_distribution == "CentOS"
+
+
+  -  name: start and enable docker
+     service:
+        name: docker
+        state: started
+
+  - name: copy the docker file
+    copy: src=dockerfile dest=/benci/docker/
+
+  - name: docker application container
+    docker_image:
+      name: ansiblecontainer
+      build:
+        path: /benci/docker/
+        args:
+          listen_port: 8080
+      source: build
+
+- hosts: all
+  become: true
+  pre_tasks:
+
+  - name: start httdp for Prometheus (CentOS)
+    tags: apache, centos, httpd, prometheus
+    service:
+      name: httpd
+      state: started
+    when: ansible_distribution == "CentOS"
+
+- hosts: Centos
+  become: true
+  roles:
+    - prom
